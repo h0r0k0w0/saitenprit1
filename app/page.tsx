@@ -23,7 +23,9 @@ const MODEL_OPTIONS = [
 ] as const;
 
 export default function Home() {
-  const [modelId, setModelId] = useState(MODEL_OPTIONS[0].id);
+  const [modelId, setModelId] = useState<
+    (typeof MODEL_OPTIONS)[number]["id"]
+  >(MODEL_OPTIONS[0].id);
   const [scenario, setScenario] = useState("");
   const [response, setResponse] = useState("");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
@@ -90,7 +92,11 @@ export default function Home() {
               <select
                 id="model"
                 value={modelId}
-                onChange={(event) => setModelId(event.target.value)}
+                onChange={(event) =>
+                  setModelId(
+                    event.target.value as (typeof MODEL_OPTIONS)[number]["id"]
+                  )
+                }
               >
                 {MODEL_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
