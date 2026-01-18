@@ -1,0 +1,156 @@
+import { NextResponse } from "next/server";
+
+const MODEL_MAP = {
+  "gpt-5.2-2025-12-11": "openai",
+  "claude-opus-4-5-20251101": "anthropic",
+  "gemini-3-pro-preview": "gemini"
+} as const;
+
+type Provider = (typeof MODEL_MAP)[keyof typeof MODEL_MAP];
+
+type RequestPayload = {
+  model: keyof typeof MODEL_MAP;
+  provider?: Provider;
+  scenario: string;
+  response: string;
+  promptTemplate: string;
+  temperature: number;
+  maxTokens: number;
+};
+
+function buildPrompt(template: string, scenario: string, response: string) {
+  if (template.includes("<<<ここにシナリオ>>>") || template.includes("<<<ここに自由記述回答>>>")) {
+    return template
+      .replace("<<<ここにシナリオ>>>", scenario.trim())
+      .replace("<<<ここに自由記述回答>>>", response.trim());
+  }
+
+  return `${template.trim()}\n\n【SCENARIO】\n${scenario.trim()}\n\n【RESPONSE】\n${response.trim()}`;
+}
+
+function assertEnv(provider: Provider) {
+  if (provider === "openai" && !process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY が設定されていません。");
+  }
+  if (provider === "anthropic" && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY が設定されていません。");
+  }
+  if (provider === "gemini" && !process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY が設定されていません。");
+  }
+}
+
+function extractOpenAiText(data: any) {
+  if (typeof data?.output_text === "string") {
+    return data.output_text;
+  }
+  const content = data?.output?.[0]?.content;
+  if (Array.isArray(content)) {
+    return content.map((item: any) => item?.text).filter(Boolean).join("\n");
+  }
+  return "";
+}
+
+function extractAnthropicText(data: any) {
+  const content = data?.content;
+  if (Array.isArray(content)) {
+    return content.map((item: any) => item?.text).filter(Boolean).join("\n");
+  }
+  return "";
+}
+
+function extractGeminiText(data: any) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) {
+    return parts.map((item: any) => item?.text).filter(Boolean).join("\n");
+  }
+  return "";
+}
+
+export async function POST(req: Request) {
+  try {
+    const payload = (await req.json()) as RequestPayload;
+    const provider = payload.provider ?? MODEL_MAP[payload.model];
+    if (!provider) {
+      return NextResponse.json({ error: "未対応のモデルです。" }, { status: 400 });
+    }
+
+    assertEnv(provider);
+
+    const prompt = buildPrompt(payload.promptTemplate, payload.scenario, payload.response);
+    let responseData: any;
+    let text = "";
+
+    if (provider === "openai") {
+      const apiResponse = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: payload.model,
+          input: prompt,
+          temperature: payload.temperature,
+          max_output_tokens: payload.maxTokens
+        })
+      });
+      responseData = await apiResponse.json();
+      if (!apiResponse.ok) {
+        return NextResponse.json({ error: responseData?.error?.message || "OpenAI APIエラー" }, { status: 500 });
+      }
+      text = extractOpenAiText(responseData);
+    }
+
+    if (provider === "anthropic") {
+      const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: payload.model,
+          max_tokens: payload.maxTokens,
+          temperature: payload.temperature,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      responseData = await apiResponse.json();
+      if (!apiResponse.ok) {
+        return NextResponse.json({ error: responseData?.error?.message || "Anthropic APIエラー" }, { status: 500 });
+      }
+      text = extractAnthropicText(responseData);
+    }
+
+    if (provider === "gemini") {
+      const apiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: payload.temperature,
+              maxOutputTokens: payload.maxTokens
+            }
+          })
+        }
+      );
+      responseData = await apiResponse.json();
+      if (!apiResponse.ok) {
+        return NextResponse.json({ error: responseData?.error?.message || "Gemini APIエラー" }, { status: 500 });
+      }
+      text = extractGeminiText(responseData);
+    }
+
+    return NextResponse.json({ text, raw: responseData });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "不明なエラーです。";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
