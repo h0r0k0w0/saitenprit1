@@ -37,6 +37,10 @@ export default function Home() {
   const [openAiMaxCompletionTokens, setOpenAiMaxCompletionTokens] = useState(1200);
   const [openAiReasoningEffort, setOpenAiReasoningEffort] = useState("medium");
   const [openAiVerbosity, setOpenAiVerbosity] = useState("medium");
+  // Gemini 3 Pro の生成パラメータはここで初期値を設定できます。
+  const [geminiTemperature, setGeminiTemperature] = useState(0.2);
+  const [geminiMaxOutputTokens, setGeminiMaxOutputTokens] = useState(1200);
+  const [geminiThinkingLevel, setGeminiThinkingLevel] = useState("high");
   const [openAiApiKey, setOpenAiApiKey] = useState("");
   const [anthropicApiKey, setAnthropicApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
@@ -87,6 +91,11 @@ export default function Home() {
             maxCompletionTokens: openAiMaxCompletionTokens,
             reasoningEffort: openAiReasoningEffort,
             verbosity: openAiVerbosity
+          },
+          gemini: {
+            temperature: geminiTemperature,
+            maxOutputTokens: geminiMaxOutputTokens,
+            thinkingLevel: geminiThinkingLevel
           },
           apiKeys: {
             openai: openAiApiKey || undefined,
@@ -190,6 +199,42 @@ export default function Home() {
               </div>
             </div>
             <small>OpenAI(GPT-5.2)用のパラメータです。他モデルには適用されません。</small>
+
+            <div className="grid cols-2">
+              <div>
+                <label htmlFor="geminiTemperature">Gemini temperature</label>
+                <input
+                  id="geminiTemperature"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={geminiTemperature}
+                  onChange={(event) => setGeminiTemperature(Number(event.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="geminiMaxTokens">Gemini maxOutputTokens</label>
+                <input
+                  id="geminiMaxTokens"
+                  type="number"
+                  min={200}
+                  max={4000}
+                  value={geminiMaxOutputTokens}
+                  onChange={(event) => setGeminiMaxOutputTokens(Number(event.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="geminiThinkingLevel">Gemini thinkingLevel</label>
+                <input
+                  id="geminiThinkingLevel"
+                  type="text"
+                  value={geminiThinkingLevel}
+                  onChange={(event) => setGeminiThinkingLevel(event.target.value)}
+                />
+              </div>
+            </div>
+            <small>Gemini 3 Pro の設定です。thinkingLevel の初期値は high です。</small>
 
             <div>
               <label htmlFor="openAiApiKey">OpenAI API Key</label>

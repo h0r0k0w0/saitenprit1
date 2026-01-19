@@ -19,6 +19,11 @@ type RequestPayload = {
     reasoningEffort?: string;
     verbosity?: string;
   };
+  gemini?: {
+    temperature: number;
+    maxOutputTokens: number;
+    thinkingLevel?: string;
+  };
   apiKeys?: {
     openai?: string;
     anthropic?: string;
@@ -152,10 +157,11 @@ export async function POST(req: Request) {
           }
 
           if (provider === "gemini") {
-            // Geminiのパラメータはここでモデル別に固定できます。
-            const geminiConfig = {
+            // GeminiのパラメータはUIから渡されます。未指定時はここがデフォルトです。
+            const geminiConfig = payload.gemini ?? {
               temperature: 0.2,
-              maxOutputTokens: 1200
+              maxOutputTokens: 1200,
+              thinkingLevel: "high"
             };
             const apiResponse = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${
@@ -170,7 +176,13 @@ export async function POST(req: Request) {
                   contents: [{ role: "user", parts: [{ text: prompt }] }],
                   generationConfig: {
                     temperature: geminiConfig.temperature,
-                    maxOutputTokens: geminiConfig.maxOutputTokens
+                    maxOutputTokens: geminiConfig.maxOutputTokens,
+                    seed
+                  },
+                  config: {
+                    thinkingConfig: {
+                      thinkingLevel: geminiConfig.thinkingLevel
+                    }
                   }
                 })
               }
