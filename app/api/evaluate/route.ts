@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const MODEL_MAP = {
-  "gpt-5.2-pro-2025-12-11": "openai",
+  "gpt-5.2-2025-12-11": "openai",
   "claude-opus-4-5-20251101": "anthropic",
   "gemini-3-pro-preview": "gemini"
 } as const;
@@ -15,9 +15,9 @@ type RequestPayload = {
   response: string;
   promptTemplate: string;
   openAi?: {
-    maxOutputTokens: number;
+    maxCompletionTokens: number;
     reasoningEffort?: string;
-    textVerbosity?: string;
+    verbosity?: string;
   };
   apiKeys?: {
     openai?: string;
@@ -50,12 +50,9 @@ function assertEnv(provider: Provider, apiKeys?: RequestPayload["apiKeys"]) {
 }
 
 function extractOpenAiText(data: any) {
-  if (typeof data?.output_text === "string") {
-    return data.output_text;
-  }
-  const content = data?.output?.[0]?.content;
-  if (Array.isArray(content)) {
-    return content.map((item: any) => item?.text).filter(Boolean).join("\n");
+  const message = data?.choices?.[0]?.message?.content;
+  if (typeof message === "string") {
+    return message;
   }
   return "";
 }
@@ -94,9 +91,9 @@ export async function POST(req: Request) {
     const prompt = buildPrompt(payload.promptTemplate, payload.scenario, payload.response);
     // OpenAIのパラメータはUIから渡されます。未指定時はここがデフォルトです。
     const openAiConfig = payload.openAi ?? {
-      maxOutputTokens: 1200,
+      maxCompletionTokens: 1200,
       reasoningEffort: "medium",
-      textVerbosity: "medium"
+      verbosity: "medium"
     };
     const results = await Promise.all(
       seeds.map(async (seed) => {
@@ -105,7 +102,7 @@ export async function POST(req: Request) {
           let text = "";
 
           if (provider === "openai") {
-            const apiResponse = await fetch("https://api.openai.com/v1/responses", {
+            const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -113,15 +110,11 @@ export async function POST(req: Request) {
               },
               body: JSON.stringify({
                 model: payload.model,
-                input: prompt,
-                max_output_tokens: openAiConfig.maxOutputTokens,
+                messages: [{ role: "user", content: prompt }],
+                max_completion_tokens: openAiConfig.maxCompletionTokens,
                 seed,
-                reasoning: openAiConfig.reasoningEffort
-                  ? { effort: openAiConfig.reasoningEffort }
-                  : undefined,
-                text: openAiConfig.textVerbosity
-                  ? { verbosity: openAiConfig.textVerbosity }
-                  : undefined
+                reasoning_effort: openAiConfig.reasoningEffort,
+                verbosity: openAiConfig.verbosity
               })
             });
             responseData = await apiResponse.json();

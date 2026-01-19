@@ -8,7 +8,7 @@ const DEFAULT_TEMPLATE = `あなたは「短文シナリオに対する自由記
 // id: APIに渡すモデル名 / label: UI表示名 / provider: APIプロバイダー
 const MODEL_OPTIONS = [
   {
-    id: "gpt-5.2-pro-2025-12-11",
+    id: "gpt-5.2-2025-12-11",
     label: "GPT-5.2 (OpenAI)",
     provider: "openai"
   },
@@ -34,9 +34,9 @@ export default function Home() {
   const [response, setResponse] = useState("");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   // OpenAI(GPT-5.2)の生成パラメータはここで初期値を設定できます。
-  const [openAiMaxOutputTokens, setOpenAiMaxOutputTokens] = useState(1200);
+  const [openAiMaxCompletionTokens, setOpenAiMaxCompletionTokens] = useState(1200);
   const [openAiReasoningEffort, setOpenAiReasoningEffort] = useState("medium");
-  const [openAiTextVerbosity, setOpenAiTextVerbosity] = useState("medium");
+  const [openAiVerbosity, setOpenAiVerbosity] = useState("medium");
   const [openAiApiKey, setOpenAiApiKey] = useState("");
   const [anthropicApiKey, setAnthropicApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
@@ -84,9 +84,9 @@ export default function Home() {
           response,
           promptTemplate: template,
           openAi: {
-            maxOutputTokens: openAiMaxOutputTokens,
+            maxCompletionTokens: openAiMaxCompletionTokens,
             reasoningEffort: openAiReasoningEffort,
-            textVerbosity: openAiTextVerbosity
+            verbosity: openAiVerbosity
           },
           apiKeys: {
             openai: openAiApiKey || undefined,
@@ -102,7 +102,21 @@ export default function Home() {
         throw new Error(payload.error || "評価に失敗しました。");
       }
 
-      setOutput(JSON.stringify(payload, null, 2));
+      const results = Array.isArray(payload.results) ? payload.results : [];
+      const scores = results
+        .map((result: { text?: string }) => {
+          if (!result?.text) {
+            return "N/A";
+          }
+          try {
+            const parsed = JSON.parse(result.text);
+            return typeof parsed?.Total_0_100 === "number" ? String(parsed.Total_0_100) : "N/A";
+          } catch {
+            return "N/A";
+          }
+        })
+        .join("\t");
+      setOutput(`${JSON.stringify(payload, null, 2)}\n\nScores:\t${scores}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "予期せぬエラーが発生しました。");
     } finally {
@@ -146,18 +160,18 @@ export default function Home() {
 
             <div className="grid cols-2">
               <div>
-                <label htmlFor="openAiMaxTokens">OpenAI Max output tokens</label>
+                <label htmlFor="openAiMaxTokens">OpenAI max_completion_tokens</label>
                 <input
                   id="openAiMaxTokens"
                   type="number"
                   min={200}
                   max={4000}
-                  value={openAiMaxOutputTokens}
-                  onChange={(event) => setOpenAiMaxOutputTokens(Number(event.target.value))}
+                  value={openAiMaxCompletionTokens}
+                  onChange={(event) => setOpenAiMaxCompletionTokens(Number(event.target.value))}
                 />
               </div>
               <div>
-                <label htmlFor="openAiReasoningEffort">OpenAI reasoning.effort</label>
+                <label htmlFor="openAiReasoningEffort">OpenAI reasoning_effort</label>
                 <input
                   id="openAiReasoningEffort"
                   type="text"
@@ -166,12 +180,12 @@ export default function Home() {
                 />
               </div>
               <div>
-                <label htmlFor="openAiTextVerbosity">OpenAI text.verbosity</label>
+                <label htmlFor="openAiVerbosity">OpenAI verbosity</label>
                 <input
-                  id="openAiTextVerbosity"
+                  id="openAiVerbosity"
                   type="text"
-                  value={openAiTextVerbosity}
-                  onChange={(event) => setOpenAiTextVerbosity(event.target.value)}
+                  value={openAiVerbosity}
+                  onChange={(event) => setOpenAiVerbosity(event.target.value)}
                 />
               </div>
             </div>
