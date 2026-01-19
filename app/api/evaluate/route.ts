@@ -19,6 +19,11 @@ type RequestPayload = {
     reasoningEffort?: string;
     textVerbosity?: string;
   };
+  apiKeys?: {
+    openai?: string;
+    anthropic?: string;
+    gemini?: string;
+  };
   seeds: number[];
 };
 
@@ -32,14 +37,14 @@ function buildPrompt(template: string, scenario: string, response: string) {
   return `${template.trim()}\n\n【SCENARIO】\n${scenario.trim()}\n\n【RESPONSE】\n${response.trim()}`;
 }
 
-function assertEnv(provider: Provider) {
-  if (provider === "openai" && !process.env.OPENAI_API_KEY) {
+function assertEnv(provider: Provider, apiKeys?: RequestPayload["apiKeys"]) {
+  if (provider === "openai" && !(apiKeys?.openai || process.env.OPENAI_API_KEY)) {
     throw new Error("OPENAI_API_KEY が設定されていません。");
   }
-  if (provider === "anthropic" && !process.env.ANTHROPIC_API_KEY) {
+  if (provider === "anthropic" && !(apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY)) {
     throw new Error("ANTHROPIC_API_KEY が設定されていません。");
   }
-  if (provider === "gemini" && !process.env.GEMINI_API_KEY) {
+  if (provider === "gemini" && !(apiKeys?.gemini || process.env.GEMINI_API_KEY)) {
     throw new Error("GEMINI_API_KEY が設定されていません。");
   }
 }
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "seedを1つ以上指定してください。" }, { status: 400 });
     }
 
-    assertEnv(provider);
+    assertEnv(provider, payload.apiKeys);
 
     const prompt = buildPrompt(payload.promptTemplate, payload.scenario, payload.response);
     // OpenAIのパラメータはUIから渡されます。未指定時はここがデフォルトです。
@@ -104,7 +109,7 @@ export async function POST(req: Request) {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+                Authorization: `Bearer ${payload.apiKeys?.openai || process.env.OPENAI_API_KEY}`
               },
               body: JSON.stringify({
                 model: payload.model,
@@ -136,7 +141,7 @@ export async function POST(req: Request) {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+                "x-api-key": payload.apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY ?? "",
                 "anthropic-version": "2023-06-01"
               },
               body: JSON.stringify({
@@ -160,7 +165,9 @@ export async function POST(req: Request) {
               maxOutputTokens: 1200
             };
             const apiResponse = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+              `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${
+                payload.apiKeys?.gemini || process.env.GEMINI_API_KEY
+              }`,
               {
                 method: "POST",
                 headers: {

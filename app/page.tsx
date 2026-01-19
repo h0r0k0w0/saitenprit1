@@ -37,6 +37,9 @@ export default function Home() {
   const [openAiMaxOutputTokens, setOpenAiMaxOutputTokens] = useState(1200);
   const [openAiReasoningEffort, setOpenAiReasoningEffort] = useState("medium");
   const [openAiTextVerbosity, setOpenAiTextVerbosity] = useState("medium");
+  const [openAiApiKey, setOpenAiApiKey] = useState("");
+  const [anthropicApiKey, setAnthropicApiKey] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [seedInput, setSeedInput] = useState("1,2,3,4,5,6,7,8,9,10");
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
@@ -84,6 +87,11 @@ export default function Home() {
             maxOutputTokens: openAiMaxOutputTokens,
             reasoningEffort: openAiReasoningEffort,
             textVerbosity: openAiTextVerbosity
+          },
+          apiKeys: {
+            openai: openAiApiKey || undefined,
+            anthropic: anthropicApiKey || undefined,
+            gemini: geminiApiKey || undefined
           },
           seeds
         })
@@ -168,6 +176,38 @@ export default function Home() {
               </div>
             </div>
             <small>OpenAI(GPT-5.2)用のパラメータです。他モデルには適用されません。</small>
+
+            <div>
+              <label htmlFor="openAiApiKey">OpenAI API Key</label>
+              <input
+                id="openAiApiKey"
+                type="password"
+                placeholder="sk-..."
+                value={openAiApiKey}
+                onChange={(event) => setOpenAiApiKey(event.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="anthropicApiKey">Anthropic API Key</label>
+              <input
+                id="anthropicApiKey"
+                type="password"
+                placeholder="sk-ant-..."
+                value={anthropicApiKey}
+                onChange={(event) => setAnthropicApiKey(event.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="geminiApiKey">Gemini API Key</label>
+              <input
+                id="geminiApiKey"
+                type="password"
+                placeholder="AIza..."
+                value={geminiApiKey}
+                onChange={(event) => setGeminiApiKey(event.target.value)}
+              />
+              <small>UIに入力しない場合は環境変数のAPIキーが使われます。</small>
+            </div>
 
             <div>
               <label htmlFor="seeds">seed (最大10個)</label>
