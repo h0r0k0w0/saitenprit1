@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const MODEL_MAP = {
-  "gpt-5.2-2025-12-11": "openai",
+  "gpt-5.2-pro-2025-12-11": "openai",
   "claude-opus-4-5-20251101": "anthropic",
   "gemini-3-pro-preview": "gemini"
 } as const;
@@ -15,7 +15,6 @@ type RequestPayload = {
   response: string;
   promptTemplate: string;
   openAi?: {
-    temperature: number;
     maxOutputTokens: number;
     reasoningEffort?: string;
     textVerbosity?: string;
@@ -90,7 +89,6 @@ export async function POST(req: Request) {
     const prompt = buildPrompt(payload.promptTemplate, payload.scenario, payload.response);
     // OpenAIのパラメータはUIから渡されます。未指定時はここがデフォルトです。
     const openAiConfig = payload.openAi ?? {
-      temperature: 0.2,
       maxOutputTokens: 1200,
       reasoningEffort: "medium",
       textVerbosity: "medium"
@@ -111,7 +109,6 @@ export async function POST(req: Request) {
               body: JSON.stringify({
                 model: payload.model,
                 input: prompt,
-                temperature: openAiConfig.temperature,
                 max_output_tokens: openAiConfig.maxOutputTokens,
                 seed,
                 reasoning: openAiConfig.reasoningEffort

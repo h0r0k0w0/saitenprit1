@@ -8,7 +8,7 @@ const DEFAULT_TEMPLATE = `あなたは「短文シナリオに対する自由記
 // id: APIに渡すモデル名 / label: UI表示名 / provider: APIプロバイダー
 const MODEL_OPTIONS = [
   {
-    id: "gpt-5.2-2025-12-11",
+    id: "gpt-5.2-pro-2025-12-11",
     label: "GPT-5.2 (OpenAI)",
     provider: "openai"
   },
@@ -34,7 +34,6 @@ export default function Home() {
   const [response, setResponse] = useState("");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   // OpenAI(GPT-5.2)の生成パラメータはここで初期値を設定できます。
-  const [openAiTemperature, setOpenAiTemperature] = useState(0.2);
   const [openAiMaxOutputTokens, setOpenAiMaxOutputTokens] = useState(1200);
   const [openAiReasoningEffort, setOpenAiReasoningEffort] = useState("medium");
   const [openAiTextVerbosity, setOpenAiTextVerbosity] = useState("medium");
@@ -82,7 +81,6 @@ export default function Home() {
           response,
           promptTemplate: template,
           openAi: {
-            temperature: openAiTemperature,
             maxOutputTokens: openAiMaxOutputTokens,
             reasoningEffort: openAiReasoningEffort,
             textVerbosity: openAiTextVerbosity
@@ -139,18 +137,6 @@ export default function Home() {
             </div>
 
             <div className="grid cols-2">
-              <div>
-                <label htmlFor="openAiTemperature">OpenAI Temperature</label>
-                <input
-                  id="openAiTemperature"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={openAiTemperature}
-                  onChange={(event) => setOpenAiTemperature(Number(event.target.value))}
-                />
-              </div>
               <div>
                 <label htmlFor="openAiMaxTokens">OpenAI Max output tokens</label>
                 <input
