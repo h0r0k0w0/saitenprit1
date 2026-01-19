@@ -24,6 +24,8 @@ const MODEL_OPTIONS = [
   }
 ] as const;
 
+const MAX_SEEDS = 10;
+
 export default function Home() {
   const [modelId, setModelId] = useState<
     (typeof MODEL_OPTIONS)[number]["id"]
@@ -35,6 +37,7 @@ export default function Home() {
   // 例: 温度(temperature)や最大トークン数(maxTokens)を変更したい場合は下を編集します。
   const [temperature, setTemperature] = useState(0.2);
   const [maxTokens, setMaxTokens] = useState(1200);
+  const [seedInput, setSeedInput] = useState("1,2,3,4,5,6,7,8,9,10");
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,12 +47,30 @@ export default function Home() {
     [modelId]
   );
 
+  const parseSeeds = (value: string) => {
+    const seeds = value
+      .split(/[\s,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry));
+    return Array.from(new Set(seeds)).slice(0, MAX_SEEDS);
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
     setOutput(null);
 
     try {
+      const seeds = parseSeeds(seedInput);
+      if (seeds.length === 0) {
+        throw new Error("seedを1つ以上入力してください。");
+      }
+      if (seeds.length > MAX_SEEDS) {
+        throw new Error(`seedは最大${MAX_SEEDS}個までにしてください。`);
+      }
+
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,7 +81,8 @@ export default function Home() {
           response,
           promptTemplate: template,
           temperature,
-          maxTokens
+          maxTokens,
+          seeds
         })
       });
 
@@ -69,7 +91,7 @@ export default function Home() {
         throw new Error(payload.error || "評価に失敗しました。");
       }
 
-      setOutput(payload.text || JSON.stringify(payload, null, 2));
+      setOutput(JSON.stringify(payload, null, 2));
     } catch (err) {
       setError(err instanceof Error ? err.message : "予期せぬエラーが発生しました。");
     } finally {
@@ -138,6 +160,19 @@ export default function Home() {
             </div>
 
             <div>
+              <label htmlFor="seeds">seed (最大10個)</label>
+              <textarea
+                id="seeds"
+                placeholder="例: 1,2,3,4,5,6,7,8,9,10"
+                value={seedInput}
+                onChange={(event) => setSeedInput(event.target.value)}
+              />
+              <small>
+                カンマ/改行区切りで最大10個まで入力できます。重複は自動で除外されます。
+              </small>
+            </div>
+
+            <div>
               <label htmlFor="scenario">SCENARIO</label>
               <textarea
                 id="scenario"
@@ -180,7 +215,8 @@ export default function Home() {
         <div className="card">
           <h2>出力</h2>
           <p>
-            モデル出力はJSONのみの想定です。必要に応じて整形したJSONをコピーしてください。
+            seedごとの結果が配列で返ります。モデル出力はJSONのみの想定です。必要に応じて整形したJSONを
+            コピーしてください。
           </p>
           <div className="response">
             {output || "まだ実行されていません。"}

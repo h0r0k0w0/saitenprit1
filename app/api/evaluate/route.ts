@@ -16,6 +16,7 @@ type RequestPayload = {
   promptTemplate: string;
   temperature: number;
   maxTokens: number;
+  seeds: number[];
 };
 
 function buildPrompt(template: string, scenario: string, response: string) {
@@ -75,80 +76,97 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "未対応のモデルです。" }, { status: 400 });
     }
 
+    const seeds = payload.seeds?.filter((seed) => Number.isInteger(seed)).slice(0, 10);
+    if (!seeds || seeds.length === 0) {
+      return NextResponse.json({ error: "seedを1つ以上指定してください。" }, { status: 400 });
+    }
+
     assertEnv(provider);
 
     const prompt = buildPrompt(payload.promptTemplate, payload.scenario, payload.response);
-    let responseData: any;
-    let text = "";
+    const results = await Promise.all(
+      seeds.map(async (seed) => {
+        try {
+          let responseData: any;
+          let text = "";
 
-    if (provider === "openai") {
-      const apiResponse = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: payload.model,
-          input: prompt,
-          temperature: payload.temperature,
-          max_output_tokens: payload.maxTokens
-        })
-      });
-      responseData = await apiResponse.json();
-      if (!apiResponse.ok) {
-        return NextResponse.json({ error: responseData?.error?.message || "OpenAI APIエラー" }, { status: 500 });
-      }
-      text = extractOpenAiText(responseData);
-    }
-
-    if (provider === "anthropic") {
-      const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: payload.model,
-          max_tokens: payload.maxTokens,
-          temperature: payload.temperature,
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      responseData = await apiResponse.json();
-      if (!apiResponse.ok) {
-        return NextResponse.json({ error: responseData?.error?.message || "Anthropic APIエラー" }, { status: 500 });
-      }
-      text = extractAnthropicText(responseData);
-    }
-
-    if (provider === "gemini") {
-      const apiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: payload.temperature,
-              maxOutputTokens: payload.maxTokens
+          if (provider === "openai") {
+            const apiResponse = await fetch("https://api.openai.com/v1/responses", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+              },
+              body: JSON.stringify({
+                model: payload.model,
+                input: prompt,
+                temperature: payload.temperature,
+                max_output_tokens: payload.maxTokens,
+                seed
+              })
+            });
+            responseData = await apiResponse.json();
+            if (!apiResponse.ok) {
+              return { seed, error: responseData?.error?.message || "OpenAI APIエラー", raw: responseData };
             }
-          })
-        }
-      );
-      responseData = await apiResponse.json();
-      if (!apiResponse.ok) {
-        return NextResponse.json({ error: responseData?.error?.message || "Gemini APIエラー" }, { status: 500 });
-      }
-      text = extractGeminiText(responseData);
-    }
+            text = extractOpenAiText(responseData);
+          }
 
-    return NextResponse.json({ text, raw: responseData });
+          if (provider === "anthropic") {
+            const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+                "anthropic-version": "2023-06-01"
+              },
+              body: JSON.stringify({
+                model: payload.model,
+                max_tokens: payload.maxTokens,
+                temperature: payload.temperature,
+                messages: [{ role: "user", content: prompt }]
+              })
+            });
+            responseData = await apiResponse.json();
+            if (!apiResponse.ok) {
+              return { seed, error: responseData?.error?.message || "Anthropic APIエラー", raw: responseData };
+            }
+            text = extractAnthropicText(responseData);
+          }
+
+          if (provider === "gemini") {
+            const apiResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  contents: [{ role: "user", parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    temperature: payload.temperature,
+                    maxOutputTokens: payload.maxTokens
+                  }
+                })
+              }
+            );
+            responseData = await apiResponse.json();
+            if (!apiResponse.ok) {
+              return { seed, error: responseData?.error?.message || "Gemini APIエラー", raw: responseData };
+            }
+            text = extractGeminiText(responseData);
+          }
+
+          return { seed, text, raw: responseData };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "不明なエラーです。";
+          return { seed, error: message };
+        }
+      })
+    );
+
+    return NextResponse.json({ results });
   } catch (error) {
     const message = error instanceof Error ? error.message : "不明なエラーです。";
     return NextResponse.json({ error: message }, { status: 500 });
