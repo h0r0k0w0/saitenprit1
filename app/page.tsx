@@ -33,10 +33,11 @@ export default function Home() {
   const [scenario, setScenario] = useState("");
   const [response, setResponse] = useState("");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
-  // モデル共通の生成パラメータはここで初期値を設定できます。
-  // 例: 温度(temperature)や最大トークン数(maxTokens)を変更したい場合は下を編集します。
-  const [temperature, setTemperature] = useState(0.2);
-  const [maxTokens, setMaxTokens] = useState(1200);
+  // OpenAI(GPT-5.2)の生成パラメータはここで初期値を設定できます。
+  const [openAiTemperature, setOpenAiTemperature] = useState(0.2);
+  const [openAiMaxOutputTokens, setOpenAiMaxOutputTokens] = useState(1200);
+  const [openAiReasoningEffort, setOpenAiReasoningEffort] = useState("medium");
+  const [openAiTextVerbosity, setOpenAiTextVerbosity] = useState("medium");
   const [seedInput, setSeedInput] = useState("1,2,3,4,5,6,7,8,9,10");
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
@@ -80,8 +81,12 @@ export default function Home() {
           scenario,
           response,
           promptTemplate: template,
-          temperature,
-          maxTokens,
+          openAi: {
+            temperature: openAiTemperature,
+            maxOutputTokens: openAiMaxOutputTokens,
+            reasoningEffort: openAiReasoningEffort,
+            textVerbosity: openAiTextVerbosity
+          },
           seeds
         })
       });
@@ -135,29 +140,48 @@ export default function Home() {
 
             <div className="grid cols-2">
               <div>
-                <label htmlFor="temperature">Temperature</label>
+                <label htmlFor="openAiTemperature">OpenAI Temperature</label>
                 <input
-                  id="temperature"
+                  id="openAiTemperature"
                   type="number"
                   min={0}
                   max={1}
                   step={0.05}
-                  value={temperature}
-                  onChange={(event) => setTemperature(Number(event.target.value))}
+                  value={openAiTemperature}
+                  onChange={(event) => setOpenAiTemperature(Number(event.target.value))}
                 />
               </div>
               <div>
-                <label htmlFor="maxTokens">Max tokens</label>
+                <label htmlFor="openAiMaxTokens">OpenAI Max output tokens</label>
                 <input
-                  id="maxTokens"
+                  id="openAiMaxTokens"
                   type="number"
                   min={200}
                   max={4000}
-                  value={maxTokens}
-                  onChange={(event) => setMaxTokens(Number(event.target.value))}
+                  value={openAiMaxOutputTokens}
+                  onChange={(event) => setOpenAiMaxOutputTokens(Number(event.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="openAiReasoningEffort">OpenAI reasoning.effort</label>
+                <input
+                  id="openAiReasoningEffort"
+                  type="text"
+                  value={openAiReasoningEffort}
+                  onChange={(event) => setOpenAiReasoningEffort(event.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="openAiTextVerbosity">OpenAI text.verbosity</label>
+                <input
+                  id="openAiTextVerbosity"
+                  type="text"
+                  value={openAiTextVerbosity}
+                  onChange={(event) => setOpenAiTextVerbosity(event.target.value)}
                 />
               </div>
             </div>
+            <small>OpenAI(GPT-5.2)用のパラメータです。他モデルには適用されません。</small>
 
             <div>
               <label htmlFor="seeds">seed (最大10個)</label>

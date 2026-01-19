@@ -14,8 +14,12 @@ type RequestPayload = {
   scenario: string;
   response: string;
   promptTemplate: string;
-  temperature: number;
-  maxTokens: number;
+  openAi?: {
+    temperature: number;
+    maxOutputTokens: number;
+    reasoningEffort?: string;
+    textVerbosity?: string;
+  };
   seeds: number[];
 };
 
@@ -84,6 +88,13 @@ export async function POST(req: Request) {
     assertEnv(provider);
 
     const prompt = buildPrompt(payload.promptTemplate, payload.scenario, payload.response);
+    // OpenAIのパラメータはUIから渡されます。未指定時はここがデフォルトです。
+    const openAiConfig = payload.openAi ?? {
+      temperature: 0.2,
+      maxOutputTokens: 1200,
+      reasoningEffort: "medium",
+      textVerbosity: "medium"
+    };
     const results = await Promise.all(
       seeds.map(async (seed) => {
         try {
@@ -100,9 +111,15 @@ export async function POST(req: Request) {
               body: JSON.stringify({
                 model: payload.model,
                 input: prompt,
-                temperature: payload.temperature,
-                max_output_tokens: payload.maxTokens,
-                seed
+                temperature: openAiConfig.temperature,
+                max_output_tokens: openAiConfig.maxOutputTokens,
+                seed,
+                reasoning: openAiConfig.reasoningEffort
+                  ? { effort: openAiConfig.reasoningEffort }
+                  : undefined,
+                text: openAiConfig.textVerbosity
+                  ? { verbosity: openAiConfig.textVerbosity }
+                  : undefined
               })
             });
             responseData = await apiResponse.json();
@@ -113,6 +130,11 @@ export async function POST(req: Request) {
           }
 
           if (provider === "anthropic") {
+            // Anthropicのパラメータはここでモデル別に固定できます。
+            const anthropicConfig = {
+              temperature: 0.2,
+              maxTokens: 1200
+            };
             const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
               headers: {
@@ -122,8 +144,8 @@ export async function POST(req: Request) {
               },
               body: JSON.stringify({
                 model: payload.model,
-                max_tokens: payload.maxTokens,
-                temperature: payload.temperature,
+                max_tokens: anthropicConfig.maxTokens,
+                temperature: anthropicConfig.temperature,
                 messages: [{ role: "user", content: prompt }]
               })
             });
@@ -135,6 +157,11 @@ export async function POST(req: Request) {
           }
 
           if (provider === "gemini") {
+            // Geminiのパラメータはここでモデル別に固定できます。
+            const geminiConfig = {
+              temperature: 0.2,
+              maxOutputTokens: 1200
+            };
             const apiResponse = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
               {
@@ -145,8 +172,8 @@ export async function POST(req: Request) {
                 body: JSON.stringify({
                   contents: [{ role: "user", parts: [{ text: prompt }] }],
                   generationConfig: {
-                    temperature: payload.temperature,
-                    maxOutputTokens: payload.maxTokens
+                    temperature: geminiConfig.temperature,
+                    maxOutputTokens: geminiConfig.maxOutputTokens
                   }
                 })
               }
