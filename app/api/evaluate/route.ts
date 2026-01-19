@@ -85,6 +85,11 @@ export async function POST(req: Request) {
     if (!provider) {
       return NextResponse.json({ error: "未対応のモデルです。" }, { status: 400 });
     }
+    console.info("[evaluate] request", {
+      model: payload.model,
+      provider,
+      seedCount: payload.seeds?.length ?? 0
+    });
 
     const seeds = payload.seeds?.filter((seed) => Number.isInteger(seed)).slice(0, 10);
     if (!seeds || seeds.length === 0) {
@@ -107,6 +112,7 @@ export async function POST(req: Request) {
           let text = "";
 
           if (provider === "openai") {
+            console.info("[evaluate] openai request", { seed });
             const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
               headers: {
@@ -124,7 +130,13 @@ export async function POST(req: Request) {
             });
             responseData = await apiResponse.json();
             if (!apiResponse.ok) {
-              return { seed, error: responseData?.error?.message || "OpenAI APIエラー", raw: responseData };
+              console.error("[evaluate] openai error", { seed, error: responseData?.error });
+              return {
+                seed,
+                stage: "openai",
+                error: responseData?.error?.message || "OpenAI APIエラー",
+                raw: responseData
+              };
             }
             text = extractOpenAiText(responseData);
           }
@@ -135,6 +147,7 @@ export async function POST(req: Request) {
               temperature: 0.2,
               maxTokens: 1200
             };
+            console.info("[evaluate] anthropic request", { seed });
             const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
               headers: {
@@ -151,7 +164,13 @@ export async function POST(req: Request) {
             });
             responseData = await apiResponse.json();
             if (!apiResponse.ok) {
-              return { seed, error: responseData?.error?.message || "Anthropic APIエラー", raw: responseData };
+              console.error("[evaluate] anthropic error", { seed, error: responseData?.error });
+              return {
+                seed,
+                stage: "anthropic",
+                error: responseData?.error?.message || "Anthropic APIエラー",
+                raw: responseData
+              };
             }
             text = extractAnthropicText(responseData);
           }
@@ -159,10 +178,11 @@ export async function POST(req: Request) {
           if (provider === "gemini") {
             // GeminiのパラメータはUIから渡されます。未指定時はここがデフォルトです。
             const geminiConfig = payload.gemini ?? {
-              temperature: 0.2,
-              maxOutputTokens: 1200,
+              temperature: 1,
+              maxOutputTokens: 65536,
               thinkingLevel: "high"
             };
+            console.info("[evaluate] gemini request", { seed });
             const apiResponse = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${payload.model}:generateContent?key=${
                 payload.apiKeys?.gemini || process.env.GEMINI_API_KEY
@@ -177,9 +197,7 @@ export async function POST(req: Request) {
                   generationConfig: {
                     temperature: geminiConfig.temperature,
                     maxOutputTokens: geminiConfig.maxOutputTokens,
-                    seed
-                  },
-                  config: {
+                    seed,
                     thinkingConfig: {
                       thinkingLevel: geminiConfig.thinkingLevel
                     }
@@ -189,7 +207,13 @@ export async function POST(req: Request) {
             );
             responseData = await apiResponse.json();
             if (!apiResponse.ok) {
-              return { seed, error: responseData?.error?.message || "Gemini APIエラー", raw: responseData };
+              console.error("[evaluate] gemini error", { seed, error: responseData?.error });
+              return {
+                seed,
+                stage: "gemini",
+                error: responseData?.error?.message || "Gemini APIエラー",
+                raw: responseData
+              };
             }
             text = extractGeminiText(responseData);
           }
@@ -197,7 +221,8 @@ export async function POST(req: Request) {
           return { seed, text, raw: responseData };
         } catch (error) {
           const message = error instanceof Error ? error.message : "不明なエラーです。";
-          return { seed, error: message };
+          console.error("[evaluate] request failed", { seed, error: message });
+          return { seed, stage: "request", error: message };
         }
       })
     );

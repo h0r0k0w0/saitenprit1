@@ -38,8 +38,8 @@ export default function Home() {
   const [openAiReasoningEffort, setOpenAiReasoningEffort] = useState("medium");
   const [openAiVerbosity, setOpenAiVerbosity] = useState("medium");
   // Gemini 3 Pro の生成パラメータはここで初期値を設定できます。
-  const [geminiTemperature, setGeminiTemperature] = useState(0.2);
-  const [geminiMaxOutputTokens, setGeminiMaxOutputTokens] = useState(1200);
+  const [geminiTemperature, setGeminiTemperature] = useState(1);
+  const [geminiMaxOutputTokens, setGeminiMaxOutputTokens] = useState(65536);
   const [geminiThinkingLevel, setGeminiThinkingLevel] = useState("high");
   const [openAiApiKey, setOpenAiApiKey] = useState("");
   const [anthropicApiKey, setAnthropicApiKey] = useState("");
