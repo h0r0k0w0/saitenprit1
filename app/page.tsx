@@ -117,8 +117,12 @@ export default function Home() {
           if (!result?.text) {
             return "N/A";
           }
+          const cleaned = result.text
+            .replace(/```json\s*/i, "")
+            .replace(/```/g, "")
+            .trim();
           try {
-            const parsed = JSON.parse(result.text);
+            const parsed = JSON.parse(cleaned);
             return typeof parsed?.Total_0_100 === "number" ? String(parsed.Total_0_100) : "N/A";
           } catch {
             return "N/A";
